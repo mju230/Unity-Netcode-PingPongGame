@@ -15,7 +15,12 @@ public class MatchingPanelController : MonoBehaviour, IPointerEnterHandler, IPoi
         panelRect.anchoredPosition = Vector2.Lerp(panelRect.anchoredPosition, targetPos, Time.deltaTime * speed);
     }
 
-
+    void OnEnable()
+    {
+        isHovered = false;
+        if (panelRect != null)
+            panelRect.anchoredPosition = new Vector2(0,0);
+    }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
