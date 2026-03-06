@@ -8,8 +8,7 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private Button playButton;
     [SerializeField] private GameObject matchingPanel;
     [SerializeField] private GameObject ModeSelectPanel;
-    [SerializeField] private GameObject CreateRoomPanel;
-    [SerializeField] private GameObject JoinRoomPanel;
+    
 
     private bool isMatching = false;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -19,10 +18,7 @@ public class LobbyManager : MonoBehaviour
             matchingPanel.SetActive(false);
         if (ModeSelectPanel != null)
             ModeSelectPanel.SetActive(false);
-        if (CreateRoomPanel != null)
-            CreateRoomPanel.SetActive(false);
-        if (JoinRoomPanel != null)
-            JoinRoomPanel.SetActive(false);
+        
     }
 
     private void Start()
@@ -50,7 +46,7 @@ public class LobbyManager : MonoBehaviour
 
     //모드 선택 판넬
 
-    //방 만들기 판넬
+    //방 만들기(호스트로 방 참가하도록)
     public void OnCreateButtonClick()
     {
         if (isMatching)
@@ -59,15 +55,30 @@ public class LobbyManager : MonoBehaviour
             Debug.Log("매칭중에는 방을 만들 수 없습니다.");
             return;
         }
-
-        CreateRoomPanel.SetActive(true);
+        if (NetworkManager.Singleton.StartHost())
+        {
+            Debug.Log("방 생성");
+            NetworkManager.Singleton.SceneManager.LoadScene("MainScene",UnityEngine.SceneManagement.LoadSceneMode.Single);
+        }      
     }
 
 
-    //방 join 판넬
+    //방 join (클라이언트로 방 참가하도록)
     public void OnJoinButtonClick()
     {
-        JoinRoomPanel.SetActive(true);
+        if (isMatching)
+        {
+            //매칭 중 방 참가 안되도록
+            Debug.Log("매칭중에는 방에 참가할 수 없습니다.");
+            return;
+        }
+
+        if (NetworkManager.Singleton.StartClient())
+        {
+            Debug.Log("방 참가");
+            
+        }
+        
     }
 
 
@@ -106,7 +117,12 @@ public class LobbyManager : MonoBehaviour
         MatchingCancel();
     }
 
-     
+
+    //게임종료 버튼
+    public void OnQuitButtonClick()
+    {
+        
+    }     
 
     private void MatchingCancel()
     {

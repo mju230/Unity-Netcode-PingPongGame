@@ -8,7 +8,7 @@ public class BallController : NetworkBehaviour
     Rigidbody2D rigid;
     public float speed = 5f;
     GameManager score;
-    
+    public ulong LastHitClientId;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
@@ -59,6 +59,11 @@ public class BallController : NetworkBehaviour
         {
             Vector2 reflectDir = Vector2.Reflect(rigid.linearVelocity, collision.contacts[0].normal);
             rigid.linearVelocity = reflectDir.normalized * speed;
+            if (collision.gameObject.CompareTag("Player"))
+            {
+                var networkObj = collision.gameObject.GetComponent<NetworkObject>();
+                LastHitClientId = networkObj.OwnerClientId;
+            }
         }
     }
 

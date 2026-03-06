@@ -17,7 +17,7 @@ GameObject:
   - component: {fileID: 9093322605254493392}
   m_Layer: 0
   m_Name: ball
-  m_TagString: Untagged
+  m_TagString: Ball
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -208,6 +208,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallController
   ShowTopMostFoldoutHeaderGroup: 1
   speed: 6
+  LastHitClientId: 0
 --- !u!114 &9093322605254493392
 MonoBehaviour:
   m_ObjectHideFlags: 0
