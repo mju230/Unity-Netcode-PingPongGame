@@ -5,6 +5,9 @@ public class ItemObject : NetworkBehaviour
 {
 
     public ItemController.Itemtype myType;
+    GameManager manager;
+    ItemController item;
+
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
@@ -12,12 +15,18 @@ public class ItemObject : NetworkBehaviour
 
         if (collision.CompareTag("Ball"))
         {
-            BallController ball = collision.GetComponent<BallController>();
+                BallController ball = collision.GetComponent<BallController>();
+                if(ball != null){
 
-            ItemController manager = FindFirstObjectByType<ItemController>();
-            manager.ApplyItem(ball.LastHitClientId, myType);
+                    ulong HittedId = ball.LastHitClientId;
 
-            manager.OnItemEaten();
+                    ItemController controller = FindFirstObjectByType<ItemController>();
+
+                    if(controller != null){
+                        controller.ApplyItem(HittedId, myType);
+                        controller.ResetSpawnTimer();
+                }
+            }
 
             GetComponent<NetworkObject>().Despawn();
         }

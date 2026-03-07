@@ -32,23 +32,24 @@ public class GameManager : NetworkBehaviour
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
+    [Header("Network Variables")]
     public NetworkVariable<int> scoreLeft = new NetworkVariable<int>(0);
     public NetworkVariable<int> scoreRight = new NetworkVariable<int>(0);
-
     public NetworkVariable<bool> isGameOver = new NetworkVariable<bool>(false);
-
+    
+    ItemController itemCntrl;
 
     void Update()
     {
         if (IsServer)
         {
-            // 1. 플레이어가 2명 이상 모이면 게임 시작으로 간주
+            // 플레이어가 2명 이상 모이면 게임 시작
             if (!isGameStarted && NetworkManager.Singleton.ConnectedClients.Count >= 2)
             {
                 isGameStarted = true;
             }
 
-            // 2. 게임이 시작되었다면 서버에서 시간을 계속 더함
+            // 게임이 시작되었다면 서버에서 시간을 계속 더함
             if (isGameStarted)
             {
                 TotalGameTime.Value += Time.deltaTime;
@@ -58,7 +59,7 @@ public class GameManager : NetworkBehaviour
         // 3. (서버/클라이언트 공통) UI에 시간 표시
         if (timerText != null)
         {
-            // 초 단위 시간을 00:00 형식으로 바꾸고 싶을 때 유용한 팁
+            
             float time = TotalGameTime.Value;
             int minutes = Mathf.FloorToInt(time / 60);
             int seconds = Mathf.FloorToInt(time % 60);
@@ -82,7 +83,8 @@ public class GameManager : NetworkBehaviour
         scoreLeft.OnValueChanged += (oldValue, newValue) =>
         {
             left.text = newValue.ToString();
-            if(newValue >= maxScore)
+            if (IsServer) ClearLeftoverItem();
+            if (newValue >= maxScore)
             {
                 leftWin.SetActive(true);
                 if (IsServer)
@@ -95,6 +97,7 @@ public class GameManager : NetworkBehaviour
         scoreRight.OnValueChanged += (oldValue, newValue) =>
         {
             right.text = newValue.ToString();
+            if (IsServer) ClearLeftoverItem();
             if (newValue >= maxScore)
             {
                 rightWin.SetActive(true);
@@ -145,6 +148,28 @@ public class GameManager : NetworkBehaviour
         leftWin.SetActive(false);
         rightWin.SetActive(false);
         restartButton.SetActive(false);
+        
+    }
+
+    public void ClearLeftoverItem()
+    {
+        if (!IsServer) return;
+
+        ItemObject activeItem = FindFirstObjectByType<ItemObject>();
+        if (activeItem != null)
+        {
+            activeItem.GetComponent<NetworkObject>().Despawn();
+        }
+
+        if (itemCntrl == null)
+        {
+            itemCntrl = FindFirstObjectByType<ItemController>();
+        }
+
+        if (itemCntrl != null)
+        {
+            itemCntrl.ResetSpawnTimer();
+        }
         
     }
 }
