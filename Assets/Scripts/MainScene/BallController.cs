@@ -1,20 +1,24 @@
 using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.InputSystem.LowLevel;
+using JetBrains.Annotations;
 
 
 public class BallController : NetworkBehaviour
 {
     Rigidbody2D rigid;
     public float speed = 5f;
+    public float originSpeed;
     GameManager score;
     public ulong LastHitClientId;
+    public Vector3 originalBallSize = Vector3.one;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Awake()
+    public void Awake()
     {
         rigid = GetComponent<Rigidbody2D>();
-        
+        originSpeed = speed;
+        originalBallSize = transform.localScale;
     }
 
     public override void OnNetworkSpawn()
@@ -90,4 +94,15 @@ public class BallController : NetworkBehaviour
             
         }
     }
+    public void SetBallSize(float multiplier)
+    {
+        transform.localScale = originalBallSize * multiplier;
+    }
+
+    public void ResetBallSize()
+    {
+        transform.localScale = originalBallSize;    
+    }
+    
+
 }

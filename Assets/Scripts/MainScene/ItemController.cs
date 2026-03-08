@@ -1,3 +1,7 @@
+//TODO 매칭시스템 구현
+
+
+
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
@@ -13,18 +17,24 @@ public class ItemController : NetworkBehaviour
     public GameObject itemPrefab;
     public float multipleItem;
 
+    BallController ballCntrl;
+
+    Coroutine spawnCoroutine;
+    Coroutine speedCoroutine;
+    Coroutine sizeCoroutine;
+    Coroutine paddleCoroutine;
 
     GameManager manager;
     [Header("Spawn Range")]
     [SerializeField] private Vector2 minPos;
     [SerializeField] private Vector2 maxPos;
 
-    private Coroutine spawnCoroutine;
-
+    
 
     public bool nextItem = true;
     List<Itemtype> itemlist = new List<Itemtype> { Itemtype.PaddleSizeUp, Itemtype.SpeedUp, Itemtype.BallSizeDown };
-    
+
+
     public override void OnNetworkSpawn()
     {
         if (IsServer)
@@ -106,74 +116,71 @@ public class ItemController : NetworkBehaviour
         {
             case Itemtype.PaddleSizeUp:
                 Debug.Log("paddlesizeup입니다");
-                StartCoroutine(PaddingSizeUp(Id));
+                paddleCoroutine = StartCoroutine(PaddingSizeUp(Id));
                 break;
 
             case Itemtype.BallSizeDown:
                 Debug.Log("ballsizedown입니다");
-                StartCoroutine(BallSizeDown());
+                sizeCoroutine = StartCoroutine(BallSizeDown());
                 break;
 
             case Itemtype.SpeedUp:
                 Debug.Log("speedup입니다");
-                StartCoroutine(SpeedUp());
+                speedCoroutine = StartCoroutine(SpeedUp());
                 break;
         }
     }
 
-    IEnumerator PaddingSizeUp(ulong Id)
+    IEnumerator PaddingSizeUp(ulong targetId)
     {
-        ChangePaddleSize(Id, multipleItem);
+        ChangePaddleSizeClientRpc(targetId, multipleItem);
         yield return new WaitForSeconds(5f);
-        ChangePaddleSize(Id, 1f);
+        ChangePaddleSizeClientRpc(targetId, 1f);
 
     }
 
-    private void ChangePaddleSize(ulong target, float sizeMultiplier)
+    [ClientRpc]
+    private void ChangePaddleSizeClientRpc(ulong targetId, float sizeMultiplier)
     {
-        if(NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(target, out NetworkObject playerObj))
-        {
-            playerObj.transform.localScale = new Vector3(1f, 3f * sizeMultiplier, 1f);
+        foreach(NetworkObject obj in NetworkManager.Singleton.SpawnManager.SpawnedObjects.Values){
+            if(!obj.IsPlayerObject) continue;
+            {
+                if(obj.OwnerClientId == targetId){
+                    obj.transform.localScale = new Vector3(1f, 3f * sizeMultiplier, 1f);
+                    return;
+                }
+            }
         }
     }
     IEnumerator BallSizeDown()
     {
-        GameObject ball = GameObject.FindGameObjectWithTag("Ball");
+        BallController ball = FindFirstObjectByType<BallController>();
         if (ball == null) yield break;
-
-        Vector3 originSize = ball.transform.localScale;
-        ball.transform.localScale = originSize * 0.5f;
-        
+        ball.SetBallSize(0.5f);
         yield return new WaitForSeconds(5f);
 
-        if (ball != null)
-        {
-            ball.transform.localScale = originSize;
-        }
+        ball.ResetBallSize();
     }
 
     IEnumerator SpeedUp()
     {
-        GameObject ball = GameObject.FindGameObjectWithTag("Ball");
-        if(ball == null) yield break;
+        BallController ball = FindFirstObjectByType<BallController>();
+        if (ball == null) yield break;
 
-        BallController ballCntrl = ball.GetComponent<BallController>();
         Rigidbody2D rigid = ball.GetComponent<Rigidbody2D>();
 
-        if(ballCntrl == null || rigid == null) yield break;
-        float originSpeed = ballCntrl.speed;
-        ballCntrl.speed = originSpeed * 2f;
+        if(rigid == null) yield break;
 
-        rigid.linearVelocity = rigid.linearVelocity * 2f;
+        float originSpeed = ball.speed;
+        ball.speed = originSpeed * 2f;
+
+        rigid.linearVelocity = rigid.linearVelocity.normalized * ball.speed;
 
         yield return new WaitForSeconds(5f);
 
-        if (ball != null)
-        {
-            ballCntrl.speed = originSpeed;
-
-            rigid.linearVelocity = rigid.linearVelocity * 0.5f;
-        }
+        ball.speed = originSpeed;
+        rigid.linearVelocity *= rigid.linearVelocity.normalized * ball.speed;
+        
     }
 
     public void ResetSpawnTimer()
@@ -189,4 +196,46 @@ public class ItemController : NetworkBehaviour
         spawnCoroutine = StartCoroutine(SpawnLoop());
     }
     
+    public void ResetAllItemEffects()
+    {
+        if(!IsServer) return;
+
+        if (speedCoroutine != null){
+            StopCoroutine(speedCoroutine);
+        }
+        if (sizeCoroutine != null){
+            StopCoroutine(sizeCoroutine);
+        }
+        if (paddleCoroutine != null){
+            StopCoroutine(paddleCoroutine);
+        }
+
+        BallController ball = FindFirstObjectByType<BallController>();
+        if(ball != null)
+        {
+            Rigidbody2D rigid = ball.GetComponent<Rigidbody2D>();
+
+            ball.speed = ball.originSpeed;
+
+            ball.ResetBallSize();
+
+            if(rigid != null)
+            {
+                rigid.linearVelocity = rigid.linearVelocity.normalized * ball.originSpeed;
+            }
+        }
+        ResetAllPaddlesClientRpc();
+        Debug.Log("아이템 효과 초기화 완료");
+    }
+
+    [ClientRpc]
+    private void ResetAllPaddlesClientRpc()
+    {
+        foreach(NetworkObject obj in NetworkManager.Singleton.SpawnManager.SpawnedObjects.Values)
+        {
+            if(!obj.IsPlayerObject) continue;
+
+            obj.transform.localScale = new Vector3(1f,3f,1f);
+        }
+    }
 }

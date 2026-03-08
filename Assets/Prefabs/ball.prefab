@@ -207,7 +207,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallController
   ShowTopMostFoldoutHeaderGroup: 1
-  speed: 6
+  speed: 5
   LastHitClientId: 0
 --- !u!114 &9093322605254493392
 MonoBehaviour:

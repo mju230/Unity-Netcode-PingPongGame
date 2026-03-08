@@ -155,6 +155,8 @@ public class GameManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
+        TotalGameTime.Value = 0;
+
         ItemObject activeItem = FindFirstObjectByType<ItemObject>();
         if (activeItem != null)
         {
@@ -168,6 +170,7 @@ public class GameManager : NetworkBehaviour
 
         if (itemCntrl != null)
         {
+            itemCntrl.ResetAllItemEffects();
             itemCntrl.ResetSpawnTimer();
         }
         
