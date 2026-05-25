@@ -3,8 +3,11 @@ using UnityEngine;
 
 public class NetworkManagerUI : MonoBehaviour
 {
+    [SerializeField] private bool showDebugButtons = false;
+
     void OnGUI()
     {
+        if (!showDebugButtons) return;
         if (NetworkManager.Singleton == null) return;
         
         GUILayout.BeginArea(new Rect(10,10,300,300));

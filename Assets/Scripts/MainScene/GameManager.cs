@@ -3,16 +3,33 @@ using Unity.Netcode;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SocialPlatforms.Impl;
-using Unity.VisualScripting;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 public class GameManager : NetworkBehaviour
 {
+    [Header("Player Prefab")]
+    [SerializeField] private GameObject playerPrefab;
+
+    [Header("Restart Vote UI")]
+    public GameObject backToLobbyButton;
+    public TextMeshProUGUI restartVoteText;
+
+    private HashSet<ulong> restartVotes = new HashSet<ulong>();
+    
+    public NetworkVariable<int> restartVoteCount = new NetworkVariable<int>(
+    0,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+    );
+
     [Header("Timer Text")]
     public NetworkVariable<float> TotalGameTime = new NetworkVariable<float>(
         0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public TMP_Text timerText;
     private bool isGameStarted = false;
+    
 
     [Header("Score Text")]
     public TextMeshProUGUI left;
@@ -29,6 +46,8 @@ public class GameManager : NetworkBehaviour
 
     [Header("UI Objects")]
     public GameObject restartButton;
+
+    private bool ballSpawned;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
 
@@ -69,17 +88,48 @@ public class GameManager : NetworkBehaviour
     
     public override void OnNetworkSpawn()
     {
+        if (IsServer)
+        {
+            SpawnPlayersIfNeeded();
+            SpawnBallIfNeeded();
+
+            isGameOver.Value = false;
+            restartVoteCount.Value = 0;
+            restartVotes.Clear();
+        }
+
+        // 기본 Ui 초기화
         if (restartButton != null)
         {
             restartButton.SetActive(false);
         }
+
+        if (backToLobbyButton != null)
+        {
+            backToLobbyButton.SetActive(false);
+        }
+
+        if (restartVoteText != null)
+        {
+            restartVoteText.gameObject.SetActive(false);
+            restartVoteText.text = "Restart Vote\n0/2";
+        }
+
+        // 점수 ui 초기화
         left.text = scoreLeft.Value.ToString();
         right.text = scoreRight.Value.ToString();
-        if(IsServer) isGameOver.Value = false;
+
+        if (IsServer)
+        {
+            isGameOver.Value = false;
+            restartVotes.Clear();
+            restartVoteCount.Value = 0;
+        } 
+
         leftWin.SetActive(false);
         rightWin.SetActive(false);
 
-
+        // 점수 변경
         scoreLeft.OnValueChanged += (oldValue, newValue) =>
         {
             left.text = newValue.ToString();
@@ -89,8 +139,7 @@ public class GameManager : NetworkBehaviour
                 leftWin.SetActive(true);
                 if (IsServer)
                 {
-                    isGameOver.Value = true;
-                    restartButton.SetActive(true);
+                    HandleGameOver();
                 }
             }
         };
@@ -103,42 +152,128 @@ public class GameManager : NetworkBehaviour
                 rightWin.SetActive(true);
                 
                 if (IsServer) {
-                    isGameOver.Value = true;
-                    restartButton.SetActive(true);
+                    HandleGameOver();
                 }
             }
         };
 
-        if (IsServer)
+        // 다시하기 투표 수 동기화
+        restartVoteCount.OnValueChanged += (oldValue, newValue) =>
         {
-            
-            NetworkManager.Singleton.OnClientConnectedCallback += (id) =>
-            {
-                if(NetworkManager.Singleton.ConnectedClients.Count == 2)
-                {
-                    SpawnBall();
-                }
-            };
+            UpdateRestartVoteText();
+        };
+
+    }
+
+    private void HandleGameOver()
+    {
+        if (!IsServer) return;
+
+        if (isGameOver.Value) return;
+
+        isGameOver.Value = true;
+
+        restartVotes.Clear();
+        restartVoteCount.Value = 0;
+
+        ShowGameOverButtonsClientRpc();
+    }
+
+    private void SpawnPlayersIfNeeded()
+    {
+        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+        {
+            if (NetworkManager.Singleton.ConnectedClients[clientId].PlayerObject != null)
+                continue;
+
+            Vector3 spawnPos = clientId == NetworkManager.ServerClientId
+                ? new Vector3(-8f, 0f, 0f)
+                : new Vector3(8f, 0f, 0f);
+
+            GameObject player = Instantiate(playerPrefab, spawnPos, Quaternion.identity);
+            player.GetComponent<NetworkObject>().SpawnAsPlayerObject(clientId, false);
         }
     }
+
+    private void SpawnBallIfNeeded()
+    {
+        if (ballSpawned) return;
+
+        ballSpawned = true;
+
+        GameObject ball = Instantiate(ballPrefab, Vector3.zero, Quaternion.identity);
+        ball.GetComponent<NetworkObject>().Spawn();
+    }
+
     void SpawnBall()
     {
         GameObject ball = Instantiate(ballPrefab, Vector3.zero, Quaternion.identity);
         ball.GetComponent<NetworkObject>().Spawn();
     }
 
+    public void OnBackToLobbyButtonClicked()
+    {
+        RequestBackToLobbyRpc();
+    }
+
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void RequestBackToLobbyRpc()
+    {
+        BackToLobbyClientRpc();
+    }
+
+    [ClientRpc]
+    private void BackToLobbyClientRpc()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
+    }
+
+
     public void OnRestartButtonClicked()
     {
-        if(!IsServer) return;
+        RequestRestartRpc();
+    }
 
+    [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+    private void RequestRestartRpc(RpcParams rpcParams = default)
+    {
+        if (!isGameOver.Value) return;
+
+        ulong senderId = rpcParams.Receive.SenderClientId;
+
+        if (restartVotes.Add(senderId))
+        {
+            restartVoteCount.Value = restartVotes.Count;
+        }
+
+        int playerCount = NetworkManager.Singleton.ConnectedClients.Count;
+
+        if (restartVotes.Count >= playerCount)
+        {
+            RestartGame();
+        }
+    }
+
+    private void RestartGame()
+    {
         scoreLeft.Value = 0;
         scoreRight.Value = 0;
         isGameOver.Value = false;
+
+        restartVotes.Clear();
+        restartVoteCount.Value = 0;
+
         BallController reball = FindFirstObjectByType<BallController>();
-        if(reball != null)
+        if (reball != null)
         {
             reball.Invoke("StartBall", 2f);
         }
+
         ResetUIClientRpc();
     }
 
@@ -147,8 +282,50 @@ public class GameManager : NetworkBehaviour
     {
         leftWin.SetActive(false);
         rightWin.SetActive(false);
-        restartButton.SetActive(false);
         
+        if (restartButton != null)
+            restartButton.SetActive(false);
+
+        if (backToLobbyButton != null)
+            backToLobbyButton.SetActive(false);
+
+        if (restartVoteText != null)
+            restartVoteText.gameObject.SetActive(false);
+
+    }
+
+    [ClientRpc]
+    private void ShowGameOverButtonsClientRpc()
+    {
+        if (restartButton != null)
+        {
+            restartButton.SetActive(true);
+        }
+
+        if (backToLobbyButton != null)
+        {
+            backToLobbyButton.SetActive(true);
+        }
+
+        if (restartVoteText != null)
+        {
+            restartVoteText.gameObject.SetActive(true);
+            UpdateRestartVoteText();
+        }
+    }
+
+    private void UpdateRestartVoteText()
+    {
+        if (restartVoteText == null) return;
+
+        int playerCount = 2;
+
+        if (NetworkManager.Singleton != null)
+        {
+            playerCount = NetworkManager.Singleton.ConnectedClients.Count;
+        }
+
+        restartVoteText.text = $"Restart Vote\n{restartVoteCount.Value}/{playerCount}";
     }
 
     public void ClearLeftoverItem()

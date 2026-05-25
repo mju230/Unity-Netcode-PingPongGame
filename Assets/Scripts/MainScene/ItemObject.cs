@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class ItemObject : NetworkBehaviour
 {
+    [SerializeField] private Sprite paddleSizeUpSprite;
+    [SerializeField] private Sprite speedUpSprite;
+    [SerializeField] private Sprite ballSizeDownSprite;
 
     public ItemController.Itemtype myType;
     GameManager manager;
@@ -30,5 +33,36 @@ public class ItemObject : NetworkBehaviour
 
             GetComponent<NetworkObject>().Despawn();
         }
+    }
+
+    public void SetSprite(ItemController.Itemtype type)
+    {
+        if (!IsServer) return;
+
+        SetSpriteClientRpc(type);
+    }
+
+    [ClientRpc]
+    private void SetSpriteClientRpc(ItemController.Itemtype type)
+    {
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        if (sr == null) return;
+
+        switch (type)
+        {
+            case ItemController.Itemtype.PaddleSizeUp:
+                sr.sprite = paddleSizeUpSprite;
+                break;
+
+            case ItemController.Itemtype.SpeedUp:
+                sr.sprite = speedUpSprite;
+                break;
+
+            case ItemController.Itemtype.BallSizeDown:
+                sr.sprite = ballSizeDownSprite;
+                break;
+        }
+
+        sr.color = Color.white;
     }
 }

@@ -1,12 +1,7 @@
-//TODO 매칭시스템 구현
-
-
-
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
 using System.Collections;
-using Unity.VisualScripting;
 using System.Security.Cryptography;
 
 
@@ -30,7 +25,7 @@ public class ItemController : NetworkBehaviour
     [SerializeField] private Vector2 maxPos;
 
     
-
+    public float itemSpawnInterval = 10f;
     public bool nextItem = true;
     List<Itemtype> itemlist = new List<Itemtype> { Itemtype.PaddleSizeUp, Itemtype.SpeedUp, Itemtype.BallSizeDown };
 
@@ -40,8 +35,21 @@ public class ItemController : NetworkBehaviour
         if (IsServer)
         {
             NetworkManager.Singleton.OnClientConnectedCallback += CheckPlayerAndStart;
+            
+            if (NetworkManager.Singleton.ConnectedClients.Count >= 2)
+            {
+                ResetSpawnTimer();
+            }
         }
     }
+
+    public override void OnNetworkDespawn()
+    {
+        if(IsServer && NetworkManager.Singleton != null){
+            NetworkManager.Singleton.OnClientConnectedCallback -= CheckPlayerAndStart;
+        }
+    }
+
 
 
     private void CheckPlayerAndStart(ulong clientId)
@@ -62,7 +70,7 @@ public class ItemController : NetworkBehaviour
             Debug.Log("아이템 스폰 대기");
 
             nextItem = false;
-            yield return new WaitForSeconds(10f);
+            yield return new WaitForSeconds(itemSpawnInterval);
             Debug.Log("아이템 생성");
             SetItemtype();
             
@@ -83,8 +91,12 @@ public class ItemController : NetworkBehaviour
         Debug.Log("아이템 Instantiate");
         GameObject obj = Instantiate(itemPrefab, GetRandomPosition(), Quaternion.identity);
 
-        obj.GetComponent<ItemObject>().myType = item;
+        ItemObject itemObject = obj.GetComponent<ItemObject>();
+        itemObject.myType = item;
+
         obj.GetComponent<NetworkObject>().Spawn();
+
+        itemObject.SetSprite(item);
        
     }
 
@@ -167,20 +179,12 @@ public class ItemController : NetworkBehaviour
         BallController ball = FindFirstObjectByType<BallController>();
         if (ball == null) yield break;
 
-        Rigidbody2D rigid = ball.GetComponent<Rigidbody2D>();
-
-        if(rigid == null) yield break;
-
-        float originSpeed = ball.speed;
-        ball.speed = originSpeed * 2f;
-
-        rigid.linearVelocity = rigid.linearVelocity.normalized * ball.speed;
+        ball.SetSpeedMultiplier(1.5f);
 
         yield return new WaitForSeconds(5f);
 
-        ball.speed = originSpeed;
-        rigid.linearVelocity *= rigid.linearVelocity.normalized * ball.speed;
-        
+        ball.SetSpeedMultiplier(1f);
+
     }
 
     public void ResetSpawnTimer()
@@ -213,16 +217,9 @@ public class ItemController : NetworkBehaviour
         BallController ball = FindFirstObjectByType<BallController>();
         if(ball != null)
         {
-            Rigidbody2D rigid = ball.GetComponent<Rigidbody2D>();
-
             ball.speed = ball.originSpeed;
-
+            ball.SetSpeedMultiplier(1f);
             ball.ResetBallSize();
-
-            if(rigid != null)
-            {
-                rigid.linearVelocity = rigid.linearVelocity.normalized * ball.originSpeed;
-            }
         }
         ResetAllPaddlesClientRpc();
         Debug.Log("아이템 효과 초기화 완료");
