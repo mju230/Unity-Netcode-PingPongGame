@@ -3,8 +3,8 @@ using UnityEngine;
 
 public class ItemObject : NetworkBehaviour
 {
-    [SerializeField] private Sprite paddleSizeUpSprite;
-    [SerializeField] private Sprite speedUpSprite;
+    [SerializeField] private Sprite playerSpeedUpSprite;
+    [SerializeField] private Sprite ballSpeedUpSprite;
     [SerializeField] private Sprite ballSizeDownSprite;
 
     public ItemController.Itemtype myType;
@@ -50,12 +50,12 @@ public class ItemObject : NetworkBehaviour
 
         switch (type)
         {
-            case ItemController.Itemtype.PaddleSizeUp:
-                sr.sprite = paddleSizeUpSprite;
+            case ItemController.Itemtype.PlayerSpeedUp:
+                sr.sprite = playerSpeedUpSprite;
                 break;
 
-            case ItemController.Itemtype.SpeedUp:
-                sr.sprite = speedUpSprite;
+            case ItemController.Itemtype.BallSpeedUp:
+                sr.sprite = ballSpeedUpSprite;
                 break;
 
             case ItemController.Itemtype.BallSizeDown:

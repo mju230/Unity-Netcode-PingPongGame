@@ -85,7 +85,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 10
   m_MaskInteraction: 0
   m_Sprite: {fileID: -3603556060819865620, guid: 3fe9eb3617d612d42b7e921696740ca5, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -210,6 +210,7 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   LastHitClientId: 0
   originalBallSize: {x: 1, y: 1, z: 1}
+  hitEffectPrefab: {fileID: 7625820449605690520, guid: 24a2de7758a6bd34c957a17456f52468, type: 3}
   audioSource: {fileID: 4474810829213383435}
   paddleHitClip: {fileID: 8300000, guid: 0439f1ddd92b67b41b52fd59a336f5f8, type: 3}
   wallHitClip: {fileID: 8300000, guid: 75ea0b91ba22f344fa24a7bffd05b56a, type: 3}
@@ -218,6 +219,8 @@ MonoBehaviour:
   maxFinalSpeed: 13
   speedIncreasePerSecond: 0.15
   originSpeed: 0
+  outOfBoundsLimit: {x: 12, y: 7}
+  respawnDelay: 1
 --- !u!114 &9093322605254493392
 MonoBehaviour:
   m_ObjectHideFlags: 0

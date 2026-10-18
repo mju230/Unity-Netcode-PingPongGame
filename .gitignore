@@ -84,6 +84,28 @@ InitTestScene*.unity*
 /[Aa]ssets/StreamingAssets/aa*
 /[Aa]ssets/AddressableAssetsData/link.xml*
 /[Aa]ssets/Addressables_Temp*
+/Assets/40+ Simple Icons - Free/
+/Assets/40+ Simple Icons - Free.meta
+# Third-party audio asset packs
+/Assets/25 Rpg Game Tracks/
+/Assets/25 Rpg Game Tracks.meta
+
+/Assets/ArcadeGameBGM#17/
+/Assets/ArcadeGameBGM#17.meta
+
+/Assets/Casual Game Sounds U6/
+/Assets/Casual Game Sounds U6.meta
+
+/Assets/Epic Soundtracks for Every Genre - free/
+/Assets/Epic Soundtracks for Every Genre - free.meta
+
+/Assets/The_Sound_Guild_FREE_PACK_Footsteps_Volume_02/
+/Assets/The_Sound_Guild_FREE_PACK_Footsteps_Volume_02.meta
+/Assets/Sounds/UISound/
+/Assets/Sounds/UISound.meta
+
+/Assets/Sounds/BallSound/
+/Assets/Sounds/BallSound.meta
 # By default, Addressables content builds will generate addressables_content_state.bin
 # files in platform-specific subfolders, for example:
 # /Assets/AddressableAssetsData/OSX/addressables_content_state.bin

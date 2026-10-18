@@ -1,7 +1,5 @@
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.InputSystem.LowLevel;
-using JetBrains.Annotations;
 
 
 public class BallController : NetworkBehaviour
@@ -10,6 +8,7 @@ public class BallController : NetworkBehaviour
     GameManager score;
     public ulong LastHitClientId;
     public Vector3 originalBallSize = Vector3.one;
+    public GameObject hitEffectPrefab;
 
     [Header ("Audio")]
     [SerializeField] private AudioSource audioSource;
@@ -31,6 +30,11 @@ public class BallController : NetworkBehaviour
     private float speedMultiplier = 1f;
     public float originSpeed;
 
+    [Header("Out Of Bounds Recovery")]
+    [SerializeField] private Vector2 outOfBoundsLimit = new Vector2(12f, 7f);
+    [SerializeField] private float respawnDelay = 1f;
+    private bool isRespawning;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     public void Awake()
     {
@@ -48,6 +52,12 @@ public class BallController : NetworkBehaviour
         if (rigid == null) return;
 
         if (score != null && score.isGameOver.Value) return;
+
+        if (IsOutOfBounds())
+        {
+            RespawnBallAtCenter();
+            return;
+        }
 
         if (rigid.linearVelocity.sqrMagnitude <= 0.01f) return;
 
@@ -99,6 +109,8 @@ public class BallController : NetworkBehaviour
 
     void StartBall()
     {
+        isRespawning = false;
+
         float x = Random.Range(0,2) == 0 ? -1 : 1;
         float y = Random.Range(0, 2) == 0 ? -1 : 1;
 
@@ -173,6 +185,8 @@ public class BallController : NetworkBehaviour
         if (networkObj != null)
         {
             LastHitClientId = networkObj.OwnerClientId;
+            Vector2 hitPoint = collision.GetContact(0).point;
+            PlayPaddleHitEffectClientRpc(LastHitClientId, hitPoint);
         }
     }
 
@@ -185,6 +199,7 @@ public class BallController : NetworkBehaviour
             score.scoreRight.Value += 1;
             speed = originSpeed;
             speedMultiplier = 1f;
+            isRespawning = true;
             rigid.linearVelocity = Vector2.zero;
             transform.position = new Vector3(0,0,0);
             if(!score.isGameOver.Value)
@@ -196,6 +211,7 @@ public class BallController : NetworkBehaviour
             score.scoreLeft.Value += 1;
             speed = originSpeed;
             speedMultiplier = 1f;
+            isRespawning = true;
             rigid.linearVelocity = Vector2.zero;
             transform.position = new Vector3(0, 0, 0);
             if(!score.isGameOver.Value)
@@ -212,6 +228,44 @@ public class BallController : NetworkBehaviour
     {
         transform.localScale = originalBallSize;    
     }
-    
 
+    private bool IsOutOfBounds()
+    {
+        Vector3 pos = transform.position;
+        return Mathf.Abs(pos.x) > outOfBoundsLimit.x || Mathf.Abs(pos.y) > outOfBoundsLimit.y;
+    }
+
+    private void RespawnBallAtCenter()
+    {
+        if (isRespawning) return;
+
+        isRespawning = true;
+        speed = originSpeed;
+        speedMultiplier = 1f;
+        rigid.linearVelocity = Vector2.zero;
+        transform.position = Vector3.zero;
+
+        if (score == null || !score.isGameOver.Value)
+        {
+            Invoke(nameof(StartBall), respawnDelay);
+        }
+    }
+    
+    //공 쳤을때 패들 이펙트 
+
+    [ClientRpc]
+    private void PlayPaddleHitEffectClientRpc(ulong hitterClientId, Vector2 hitPoint)
+    {
+        Instantiate(hitEffectPrefab, hitPoint, Quaternion.identity);
+        PlayerController[] players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+
+        foreach (PlayerController player in players)
+        {
+            if (player.OwnerClientId == hitterClientId)
+            {
+                player.PlayHitFlash();
+                return;
+            }
+        }
+    }
 }

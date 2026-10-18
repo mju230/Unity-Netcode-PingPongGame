@@ -20,11 +20,17 @@ public class LobbyManager : MonoBehaviour
     [SerializeField] private GameObject matchingPanel;
     [SerializeField] private GameObject ModeSelectPanel;
     [SerializeField] private GameObject roomCodePanel;
+    [SerializeField] private GameObject QuitGamePanel;
     [SerializeField] private TMP_Text roomCodeText;
     [SerializeField] private Toggle allowRandomMatchToggle;
+    
 
     [SerializeField] private GameObject inputRoomCodePanel;
     [SerializeField] private TMP_InputField inputRoomCodeField;
+
+    [Header ("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip buttonClickClip;
 
     private Lobby hostedLobby;
 
@@ -44,6 +50,8 @@ public class LobbyManager : MonoBehaviour
 
         if (allowRandomMatchToggle != null)
             allowRandomMatchToggle.isOn = false;
+        if (QuitGamePanel != null)
+            QuitGamePanel.SetActive(false);
     }
 
     private async void Start()
@@ -80,6 +88,7 @@ public class LobbyManager : MonoBehaviour
 
     public void OnPlayButtonClick()
     {
+        PlayButtonClickSound();
         ModeSelectPanel.SetActive(true);
     }
 
@@ -88,6 +97,7 @@ public class LobbyManager : MonoBehaviour
     //방 만들기(호스트로 방 참가하도록)
     public async void OnCreateButtonClick()
     {
+        PlayButtonClickSound();
         if (!CanStartMatching()) return;
 
         isMatching = true;
@@ -98,8 +108,11 @@ public class LobbyManager : MonoBehaviour
 
     public async void OnRoomCodePanelExitButtonClick()
     {
+        PlayButtonClickSound();
+
         if (roomCodePanel != null)
             roomCodePanel.SetActive(false);
+        
 
         if (hostedLobby != null)
         {
@@ -168,6 +181,7 @@ public class LobbyManager : MonoBehaviour
     //방 join (클라이언트로 방 참가하도록)
     public void OnJoinButtonClick()
     {
+        PlayButtonClickSound();
         if (isMatching) return;
 
         if (inputRoomCodePanel != null)
@@ -176,6 +190,8 @@ public class LobbyManager : MonoBehaviour
 
     public async void OnJoinRoomConfirmButtonClick()
     {
+        PlayButtonClickSound();
+
         if (!CanStartMatching()) return;
         
         if (inputRoomCodeField == null)
@@ -204,8 +220,16 @@ public class LobbyManager : MonoBehaviour
 
     public void OnInputRoomCodePanelExitButtonClick()
     {
+        PlayButtonClickSound();
         if (inputRoomCodePanel != null)
             inputRoomCodePanel.SetActive(false);
+    }
+
+    private void PlayButtonClickSound()
+    {
+        if(audioSource == null || buttonClickClip == null) return;
+
+        audioSource.PlayOneShot(buttonClickClip);
     }
 
 
@@ -256,11 +280,13 @@ public class LobbyManager : MonoBehaviour
     //게임모드 나가기 버튼
     public void OnGameModeExitButtonClick()
     {
+        PlayButtonClickSound();
         ModeSelectPanel.SetActive(false);
     }
 
     public async void OnMatchingButtonClick()
     {
+        PlayButtonClickSound();
         if (!CanStartMatching()) return;
 
         isMatching = true;
@@ -282,6 +308,7 @@ public class LobbyManager : MonoBehaviour
 
     public void OnCancelButtonClick()
     {
+        PlayButtonClickSound();
         if (matchingPanel != null)
             matchingPanel.SetActive(false);
 
@@ -303,8 +330,25 @@ public class LobbyManager : MonoBehaviour
     //게임종료 버튼
     public void OnQuitButtonClick()
     {
-        
-    }     
+        PlayButtonClickSound();
+        QuitGamePanel.SetActive(true);
+    }
+
+    public void OnQuitYesButtonClick()
+    {
+        PlayButtonClickSound();
+    #if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+    #else
+        Application.Quit();
+    #endif
+    }
+
+    public void OnQuitNoButtonClick()
+    {
+        PlayButtonClickSound();
+        QuitGamePanel.SetActive(false);    
+    }
 
     private bool CanStartMatching()
     {

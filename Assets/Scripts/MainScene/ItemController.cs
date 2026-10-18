@@ -2,13 +2,12 @@ using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
 using System.Collections;
-using System.Security.Cryptography;
 
 
 public class ItemController : NetworkBehaviour
 {
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    public enum Itemtype {PaddleSizeUp, SpeedUp, BallSizeDown};
+    public enum Itemtype {PlayerSpeedUp, BallSpeedUp, BallSizeDown};
     public GameObject itemPrefab;
     public float multipleItem;
 
@@ -20,14 +19,24 @@ public class ItemController : NetworkBehaviour
     Coroutine paddleCoroutine;
 
     GameManager manager;
+    
+    [SerializeField] private float playerSpeedMultiplier = 1.5f;
+    [SerializeField] private float itemEffectDuration = 5f;
+
     [Header("Spawn Range")]
     [SerializeField] private Vector2 minPos;
     [SerializeField] private Vector2 maxPos;
 
-    
+    [Header ("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip playerSpeedUpClip;
+    [SerializeField] private AudioClip speedUpClip;
+    [SerializeField] private AudioClip ballSizeDownClip;
+
+    public float itemDespawnTimer = 10f;
     public float itemSpawnInterval = 10f;
     public bool nextItem = true;
-    List<Itemtype> itemlist = new List<Itemtype> { Itemtype.PaddleSizeUp, Itemtype.SpeedUp, Itemtype.BallSizeDown };
+    List<Itemtype> itemlist = new List<Itemtype> { Itemtype.PlayerSpeedUp, Itemtype.BallSpeedUp, Itemtype.BallSizeDown };
 
 
     public override void OnNetworkSpawn()
@@ -72,21 +81,28 @@ public class ItemController : NetworkBehaviour
             nextItem = false;
             yield return new WaitForSeconds(itemSpawnInterval);
             Debug.Log("아이템 생성");
-            SetItemtype();
+            NetworkObject spawnedItem = SetItemtype();
             
+            yield return new WaitForSeconds(itemDespawnTimer);
+            if(spawnedItem != null && spawnedItem.IsSpawned)
+            {
+                spawnedItem.Despawn();
+            }
+            nextItem = true;
         }
     }
     
 
+
     //아이템 랜덤으로 선택
-    private void SetItemtype()
+    private NetworkObject SetItemtype()
     {
         int randomIndex = Random.Range(0, itemlist.Count);
         Itemtype selectedItem = itemlist[randomIndex];
-        SpawnItem(selectedItem);
+        return SpawnItem(selectedItem);
     }
 
-    private void SpawnItem(Itemtype item)
+    private NetworkObject SpawnItem(Itemtype item)
     {
         Debug.Log("아이템 Instantiate");
         GameObject obj = Instantiate(itemPrefab, GetRandomPosition(), Quaternion.identity);
@@ -94,10 +110,12 @@ public class ItemController : NetworkBehaviour
         ItemObject itemObject = obj.GetComponent<ItemObject>();
         itemObject.myType = item;
 
-        obj.GetComponent<NetworkObject>().Spawn();
+        NetworkObject netObj = obj.GetComponent<NetworkObject>();
+        netObj.Spawn();
 
         itemObject.SetSprite(item);
-       
+
+        return netObj;
     }
 
     //아이템 스폰 위치 선정
@@ -124,11 +142,13 @@ public class ItemController : NetworkBehaviour
     {
         if(!IsServer) return;
 
+        PlayItemSfxClientRpc(type);
+
         switch (type)
         {
-            case Itemtype.PaddleSizeUp:
+            case Itemtype.PlayerSpeedUp:
                 Debug.Log("paddlesizeup입니다");
-                paddleCoroutine = StartCoroutine(PaddingSizeUp(Id));
+                paddleCoroutine = StartCoroutine(PlayerSpeedUp(Id));
                 break;
 
             case Itemtype.BallSizeDown:
@@ -136,34 +156,66 @@ public class ItemController : NetworkBehaviour
                 sizeCoroutine = StartCoroutine(BallSizeDown());
                 break;
 
-            case Itemtype.SpeedUp:
+            case Itemtype.BallSpeedUp:
                 Debug.Log("speedup입니다");
                 speedCoroutine = StartCoroutine(SpeedUp());
                 break;
         }
     }
 
-    IEnumerator PaddingSizeUp(ulong targetId)
+    [ClientRpc]
+    private void PlayItemSfxClientRpc(Itemtype type)
     {
-        ChangePaddleSizeClientRpc(targetId, multipleItem);
-        yield return new WaitForSeconds(5f);
-        ChangePaddleSizeClientRpc(targetId, 1f);
+        if(audioSource == null) return;
+        switch (type)
+        {
+            case Itemtype.PlayerSpeedUp:
+                if (playerSpeedUpClip != null)
+                    audioSource.PlayOneShot(playerSpeedUpClip);
+                break;
 
+            case Itemtype.BallSpeedUp:
+                if (speedUpClip != null)
+                    audioSource.PlayOneShot(speedUpClip);
+                break;
+
+            case Itemtype.BallSizeDown:
+                if (ballSizeDownClip != null)
+                    audioSource.PlayOneShot(ballSizeDownClip);
+                break;
+        }
+    }
+
+    IEnumerator PlayerSpeedUp(ulong targetId)
+    {
+        ChangePlayerSpeedClientRpc(targetId, playerSpeedMultiplier);
+
+        yield return new WaitForSeconds(itemEffectDuration);
+
+        ChangePlayerSpeedClientRpc(targetId, 1f);
     }
 
     [ClientRpc]
-    private void ChangePaddleSizeClientRpc(ulong targetId, float sizeMultiplier)
+    private void ChangePlayerSpeedClientRpc(ulong targetId, float speedMultiplier)
     {
-        foreach(NetworkObject obj in NetworkManager.Singleton.SpawnManager.SpawnedObjects.Values){
-            if(!obj.IsPlayerObject) continue;
+        foreach (NetworkObject obj in NetworkManager.Singleton.SpawnManager.SpawnedObjects.Values)
+        {
+            if (!obj.IsPlayerObject) continue;
+
+            if (obj.OwnerClientId == targetId)
             {
-                if(obj.OwnerClientId == targetId){
-                    obj.transform.localScale = new Vector3(1f, 3f * sizeMultiplier, 1f);
-                    return;
+                PlayerController player = obj.GetComponent<PlayerController>();
+                if (player != null)
+                {
+                    player.SetSpeedMultiplier(speedMultiplier);
                 }
+
+                return;
             }
         }
     }
+
+
     IEnumerator BallSizeDown()
     {
         BallController ball = FindFirstObjectByType<BallController>();
@@ -232,7 +284,11 @@ public class ItemController : NetworkBehaviour
         {
             if(!obj.IsPlayerObject) continue;
 
-            obj.transform.localScale = new Vector3(1f,3f,1f);
+            PlayerController player = obj.GetComponent<PlayerController>();
+            if (player != null)
+            {
+                player.SetSpeedMultiplier(1f);
+            }
         }
     }
 }

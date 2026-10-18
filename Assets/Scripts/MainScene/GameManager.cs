@@ -1,9 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
-using UnityEngine.UI;
 using TMPro;
-using UnityEngine.SocialPlatforms.Impl;
-using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 
 public class GameManager : NetworkBehaviour
@@ -46,6 +43,11 @@ public class GameManager : NetworkBehaviour
 
     [Header("UI Objects")]
     public GameObject restartButton;
+
+    [Header ("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip victoryClip;
+    [SerializeField] private AudioClip defeatClip;
 
     private bool ballSpawned;
 
@@ -139,7 +141,7 @@ public class GameManager : NetworkBehaviour
                 leftWin.SetActive(true);
                 if (IsServer)
                 {
-                    HandleGameOver();
+                    HandleGameOver(NetworkManager.ServerClientId);
                 }
             }
         };
@@ -152,7 +154,7 @@ public class GameManager : NetworkBehaviour
                 rightWin.SetActive(true);
                 
                 if (IsServer) {
-                    HandleGameOver();
+                    HandleGameOver(GetNonServerClientId());
                 }
             }
         };
@@ -165,7 +167,34 @@ public class GameManager : NetworkBehaviour
 
     }
 
-    private void HandleGameOver()
+    private ulong GetNonServerClientId()
+    {
+        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+        {
+            if (clientId != NetworkManager.ServerClientId)
+                return clientId;
+        }
+
+        return NetworkManager.ServerClientId;
+    }
+
+    // 승리, 패배 시 브금
+    [ClientRpc]
+    private void PlayGameOverSfxClientRpc(ulong winnerClientId)
+    {
+        if (audioSource == null) return;
+
+        bool isWinner = NetworkManager.Singleton.LocalClientId == winnerClientId;
+
+        AudioClip clip = isWinner ? victoryClip : defeatClip;
+
+        if (clip != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
+    }
+
+    private void HandleGameOver(ulong winnerClientId)
     {
         if (!IsServer) return;
 
@@ -177,6 +206,7 @@ public class GameManager : NetworkBehaviour
         restartVoteCount.Value = 0;
 
         ShowGameOverButtonsClientRpc();
+        PlayGameOverSfxClientRpc(winnerClientId);
     }
 
     private void SpawnPlayersIfNeeded()
@@ -280,6 +310,13 @@ public class GameManager : NetworkBehaviour
     [ClientRpc]
     void ResetUIClientRpc()
     {
+        PlayerController[] players = FindObjectsByType<PlayerController>(FindObjectsSortMode.None);
+
+        foreach (PlayerController player in players)
+        {
+            
+        }
+
         leftWin.SetActive(false);
         rightWin.SetActive(false);
         
@@ -352,4 +389,20 @@ public class GameManager : NetworkBehaviour
         }
         
     }
+
+    private ulong GetClientPlayerId()
+    {
+        foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+        {
+            if (clientId != NetworkManager.ServerClientId)
+            {
+                return clientId;
+            }
+        }
+
+        return NetworkManager.ServerClientId;
+    }
+
+
+
 }

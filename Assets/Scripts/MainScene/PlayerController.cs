@@ -1,3 +1,4 @@
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -9,34 +10,51 @@ public class PlayerController : NetworkBehaviour
     public float speed = 6f;
     SpriteRenderer sprite;
     Collider2D paddleCollider;
+    private float originSpeed;
+
+    [SerializeField] private Transform paddleVisual;
+    [SerializeField] private SpriteRenderer paddleVisualRenderer;
+    [SerializeField] private GameObject youIndicator;
+    [SerializeField] private float youIndicatorDuration = 2f;
+    
 
     [Header("Movement Bounds")]
     [SerializeField] private float topBoundY = 4.75f;
     [SerializeField] private float bottomBoundY = -4.75f;
-    
+
+
 
     void Awake()
     {
         sprite = GetComponent<SpriteRenderer>();
         paddleCollider = GetComponent<Collider2D>();
+        originSpeed = speed;
     }
 
     public override void OnNetworkSpawn()
     {
+        
         Debug.Log($"Player Spawn / Owner:{OwnerClientId} / IsOwner:{IsOwner} / IsServer:{IsServer}");
-        if (IsOwner)
+
+        bool isHostPlayer = OwnerClientId == NetworkManager.ServerClientId;
+        if(paddleVisualRenderer != null) paddleVisualRenderer.color = isHostPlayer ? Color.red : Color.blue;
+
+        if (sprite != null)
         {
-            if (OwnerClientId == NetworkManager.ServerClientId)
+            sprite.enabled = false;
+        }
+
+        if (youIndicator != null)
+        {
+            youIndicator.SetActive(false);
+
+            if (IsOwner)
             {
-                sprite.color = Color.blue;
-                transform.position = new Vector3(-8f, 0f, 0f);
-            }
-            else
-            {
-                sprite.color = Color.red;
-                transform.position = new Vector3(8f, 0f, 0f);
+                StartCoroutine(ShowYouIndicatorRoutine());
             }
         }
+
+        transform.position = isHostPlayer ? new Vector3(-7.2f, 0f, 0f): new Vector3(7.2f, 0f, 0f);
     }
 
     public override void OnNetworkDespawn()
@@ -63,6 +81,11 @@ public class PlayerController : NetworkBehaviour
 
     }
 
+    public void SetSpeedMultiplier(float multiplier)
+    {
+        speed = originSpeed * multiplier;
+    }
+    
     private void ClampToMovementBounds()
     {
         float halfHeight = 0f;
@@ -78,6 +101,38 @@ public class PlayerController : NetworkBehaviour
         Vector3 pos = transform.position;
         pos.y = Mathf.Clamp(pos.y, minY, maxY);
         transform.position = pos;
+    }
+
+    // YouIndicator 관련
+    private IEnumerator ShowYouIndicatorRoutine()
+    {
+        youIndicator.SetActive(true);
+
+        yield return new WaitForSeconds(youIndicatorDuration);
+
+        youIndicator.SetActive(false);
+    }
+
+
+
+    //헬퍼 함수들
+
+    private bool IsHostPlayer()
+    {
+        return OwnerClientId == NetworkManager.ServerClientId;
+    }
+
+    public void PlayHitFlash()
+    {
+        StartCoroutine(HitFeedbackRoutine());
+    }
+
+    private IEnumerator HitFeedbackRoutine()
+    {
+        Vector3 originScale = paddleVisual.localScale;
+        paddleVisual.localScale = originScale * 1.5f;
+        yield return new WaitForSeconds(0.08f);
+        paddleVisual.localScale = originScale;
     }
 
 }
